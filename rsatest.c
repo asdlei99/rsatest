@@ -6,7 +6,7 @@
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
 
-static int rsa_encrypt(char *pubkeyfile, int len, char *src, char *dst)
+static int rsa_public_encrypt(char *pubkeyfile, int len, char *src, char *dst)
 {
     RSA  *rsa = NULL;
     FILE *fp  = NULL;
@@ -17,7 +17,8 @@ static int rsa_encrypt(char *pubkeyfile, int len, char *src, char *dst)
         printf("failed to open public key file: %s !\n", pubkeyfile);
         return -1;
     } else {
-        rsa = PEM_read_RSAPublicKey(fp, NULL, NULL, NULL);
+//      rsa = PEM_read_RSAPublicKey(fp, NULL, NULL, NULL);
+        rsa = PEM_read_RSA_PUBKEY(fp, NULL, NULL, NULL);
         fclose(fp);
     }
 
@@ -31,7 +32,7 @@ static int rsa_encrypt(char *pubkeyfile, int len, char *src, char *dst)
     return ret;
 }
 
-static int rsa_decrypt(char *privkeyfile, int len, char *src, char *dst)
+static int rsa_private_decrypt(char *privkeyfile, int len, char *src, char *dst)
 {
     RSA  *rsa = NULL;
     FILE *fp  = NULL;
@@ -52,6 +53,57 @@ static int rsa_decrypt(char *privkeyfile, int len, char *src, char *dst)
     }
 
     ret = RSA_private_decrypt(len, src, dst, rsa, RSA_PKCS1_PADDING);
+    RSA_free(rsa);
+    return ret;
+}
+
+static int rsa_private_encrypt(char *privkeyfile, int len, char *src, char *dst)
+{
+    RSA  *rsa = NULL;
+    FILE *fp  = NULL;
+    int   ret;
+
+    fp = fopen(privkeyfile, "rb");
+    if (!fp) {
+        printf("failed to open public key file: %s !\n", privkeyfile);
+        return -1;
+    } else {
+        rsa = PEM_read_RSAPrivateKey(fp, NULL, NULL, NULL);
+        fclose(fp);
+    }
+
+    if (!rsa) {
+        printf("failed to read public key !\n");
+        return -1;
+    }
+
+    ret = RSA_private_encrypt(len, src, dst, rsa, RSA_PKCS1_PADDING);
+    RSA_free(rsa);
+    return ret;
+}
+
+static int rsa_public_decrypt(char *pubkeyfile, int len, char *src, char *dst)
+{
+    RSA  *rsa = NULL;
+    FILE *fp  = NULL;
+    int   ret;
+
+    fp = fopen(pubkeyfile, "rb");
+    if (!fp) {
+        printf("failed to open private key file: %s !\n", pubkeyfile);
+        return -1;
+    } else {
+//      rsa = PEM_read_RSAPublicKey(fp, NULL, NULL, NULL);
+        rsa = PEM_read_RSA_PUBKEY(fp, NULL, NULL, NULL);
+        fclose(fp);
+    }
+
+    if (!rsa) {
+        printf("failed to read private key !\n");
+        return -1;
+    }
+
+    ret = RSA_public_decrypt(len, src, dst, rsa, RSA_PKCS1_PADDING);
     RSA_free(rsa);
     return ret;
 }
@@ -118,14 +170,14 @@ int main(int argc, char *argv[])
     printf("txt_md5: %s\n", temp);
 
 #if 0
-    rsa_encrypt("public.key", 16, txt_md5, signature);
+    rsa_private_encrypt("private.key", 16, txt_md5, signature);
     for (i=0; i<16; i++) {
         md5_bin_to_str(signature + 16 * i, temp);
         printf("%s\n", temp);
     }
 #endif
 
-    rsa_decrypt("private.key", 256, signature, sig_md5);
+    rsa_public_decrypt("public.key", 256, signature, sig_md5);
     md5_bin_to_str(sig_md5, temp);
     printf("sig_md5: %s\n", temp);
     if (memcmp(txt_md5, sig_md5, 16) != 0) {
@@ -138,9 +190,9 @@ int main(int argc, char *argv[])
 /*
 生成私钥：
 openssl genrsa -out private.key 2048 // for c
-openssl pkcs8 -topk8 -in private.key -out pkcs8_private.key -nocrypt // for java
+openssl pkcs8 -topk8 -in private.key -out pkcs8_private.key -nocrypt // for c and java
 
 生成公钥：
-openssl rsa -in private.key -out public.key -pubout  // for java
-openssl rsa -in private.key -out public.key -RSAPublicKey_out  // for c
+openssl rsa -in private.key -out public.key -pubout // for java or c PEM_read_RSA_PUBKEY
+openssl rsa -in private.key -out public.key -RSAPublicKey_out // for c PEM_read_RSAPublicKey
  */
